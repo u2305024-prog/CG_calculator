@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#eef2f6;--card:#fff;--ink:#14213d;--mute:#5b6678;--line:#d5dce6;--accent:#0f8b73;--accent-ink:#fff}
+:root{--bg:#dde5ee;--card:#f7f9fb;--ink:#14213d;--mute:#4d5a6c;--line:#c3cfdc;--accent:#0f7a66;--accent-ink:#fff}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 main{max-width:720px;margin:0 auto;padding:0 14px 60px}
@@ -50,7 +50,16 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);ou
 .meta{color:var(--mute);font-size:.9rem}
 .hint{color:var(--mute);font-size:.85rem;text-align:center;margin:8px 0 0}
 #img{width:100%;border-radius:10px;border:1px solid var(--line);display:block;margin-bottom:14px}
-@media(max-width:420px){.row{grid-template-columns:1fr 60px 82px 30px}.mark{font-size:4.8rem}}
+.srow{display:grid;grid-template-columns:1fr auto 64px 30px;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.srow:first-of-type{margin-top:6px}
+details.card summary{cursor:pointer;font-weight:600}
+details.card summary .meta{font-weight:400;margin-left:6px}
+.sgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px 0}
+.sgrid label{margin:0;font-size:.8rem;text-align:center}
+.sgrid input{text-align:center;padding:8px 4px;margin-top:2px}
+.chk{display:flex;gap:8px;align-items:center;margin:0 0 12px;color:var(--ink);font-size:.95rem}
+input[type=checkbox]{width:auto}
+@media(max-width:420px){.sgrid{grid-template-columns:repeat(4,1fr)}.row{grid-template-columns:1fr 60px 82px 30px}.mark{font-size:4.8rem}}
 </style>
 </head>
 <body>
@@ -85,6 +94,14 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);ou
       <button class="opt" id="mTerm"><b>Term-wise</b><span>GPA of one term</span></button>
       <button class="opt" id="mAll"><b>Overall</b><span>CGPA across several terms</span></button>
     </div>
+    <div id="saved"></div>
+    <details class="card" id="scaleBox">
+      <summary>Grade scale <span class="meta" id="scaleTag"></span></summary>
+      <p class="meta" style="margin:8px 0 0">Change the grade point of any letter to match your university.</p>
+      <div class="sgrid" id="scaleGrid"></div>
+      <label class="chk"><input type="checkbox" id="skipF"> Don't count F grades in GPA (BUET style)</label>
+      <button class="btn" id="resetScale">Reset to standard</button>
+    </details>
     <div id="calc"></div>
     <div class="card sum">
       <div><div class="meta" id="sumLabel"></div><div class="big" id="sumVal">0.00</div></div>
@@ -104,25 +121,30 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);ou
       <button class="btn p" id="dl">Download image</button>
       <button class="btn" id="share">Share image</button>
     </div>
+    <div id="saveBox" style="display:none">
+      <button class="btn wide" id="saveSem">Save this semester and add next</button>
+      <p class="hint">Saves this GPA, clears the fields for a new semester. Later, open Overall to get your total CGPA.</p>
+    </div>
     <div class="btns" style="margin-top:14px">
       <button class="btn" id="back2">Edit courses</button>
       <button class="btn" id="again">Start over</button>
     </div>
-    <p class="hint">Unofficial. Grade scale: A+ 4.00, A 3.75, A- 3.50, B+ 3.25, B 3.00, B- 2.75, C+ 2.50, C 2.25, D 2.00, F 0.00.</p>
+    <p class="hint" id="scaleNote"></p>
   </section>
 </main>
 
 <script>
 // Edit this scale if your batch uses different values
-const SCALE={"A+":4,"A":3.75,"A-":3.5,"B+":3.25,"B":3,"B-":2.75,"C+":2.5,"C":2.25,"D":2,"F":0};
-const GRADES=Object.keys(SCALE), CREDITS=[0.75,1,1.5,2,3,4];
+const DEFAULT_SCALE={"A+":4,"A":3.75,"A-":3.5,"B+":3.25,"B":3,"B-":2.75,"C+":2.5,"C":2.25,"D":2,"F":0};
+let SCALE={...DEFAULT_SCALE},skipF=false;
+const GRADES=Object.keys(DEFAULT_SCALE), CREDITS=[0.75,1,1.5,2,3,4];
 const THEMES=[
- {n:"Mist",bg:"#eef2f6",card:"#ffffff",ink:"#14213d",mute:"#5b6678",line:"#d5dce6",a:"#0f8b73",ai:"#ffffff"},
- {n:"Mint",bg:"#e5f4ec",card:"#ffffff",ink:"#14213d",mute:"#566a5f",line:"#c7e2d3",a:"#15803d",ai:"#ffffff"},
- {n:"Lavender",bg:"#efeafb",card:"#ffffff",ink:"#1f1a3d",mute:"#625d7d",line:"#d9d0f0",a:"#5b4bc4",ai:"#ffffff"},
- {n:"Peach",bg:"#fdeee6",card:"#ffffff",ink:"#3a2014",mute:"#7a5f52",line:"#f3d6c6",a:"#c2410c",ai:"#ffffff"},
- {n:"Sky",bg:"#e4f0fb",card:"#ffffff",ink:"#10243c",mute:"#53697f",line:"#c6dcf0",a:"#1d6fd1",ai:"#ffffff"},
- {n:"Rose",bg:"#fbe9ef",card:"#ffffff",ink:"#3a1422",mute:"#7a5563",line:"#f0cbd8",a:"#c02657",ai:"#ffffff"},
+ {n:"Mist",bg:"#dde5ee",card:"#f7f9fb",ink:"#14213d",mute:"#4d5a6c",line:"#c3cfdc",a:"#0f7a66",ai:"#ffffff"},
+ {n:"Mint",bg:"#cfe8da",card:"#f4fbf7",ink:"#12301f",mute:"#4a5f54",line:"#b3d6c2",a:"#11743a",ai:"#ffffff"},
+ {n:"Lavender",bg:"#dcd4f3",card:"#f7f5fd",ink:"#1f1a3d",mute:"#564f75",line:"#c4b9e6",a:"#5240b8",ai:"#ffffff"},
+ {n:"Peach",bg:"#f8d9c6",card:"#fff8f3",ink:"#3a2014",mute:"#6e4f40",line:"#e9bda3",a:"#b53a08",ai:"#ffffff"},
+ {n:"Sky",bg:"#cfe3f6",card:"#f4f9fe",ink:"#10243c",mute:"#46607a",line:"#b0cde8",a:"#1a63bd",ai:"#ffffff"},
+ {n:"Rose",bg:"#f5d3df",card:"#fff6f9",ink:"#3a1422",mute:"#6e4656",line:"#e6b3c5",a:"#b01f4e",ai:"#ffffff"},
  {n:"Night",bg:"#0f1620",card:"#18212e",ink:"#e8edf4",mute:"#97a3b6",line:"#2b3748",a:"#3cc1a5",ai:"#06231d"}
 ];
 const $=id=>document.getElementById(id), fmt=n=>n.toFixed(2);
@@ -131,9 +153,15 @@ const newCourse=()=>({name:"",credit:3,grade:""});
 const newTerm=n=>({name:n||"",courses:[newCourse(),newCourse(),newCourse()]});
 const S={name:"",uni:"",mode:"term",single:newTerm(""),terms:[newTerm("Level 1 - Term I")],t:THEMES[0],blob:null};
 
-function calc(list){let q=0,c=0;list.forEach(x=>{if(x.grade&&x.credit>0){q+=SCALE[x.grade]*x.credit;c+=x.credit}});return{q,c,gpa:c?q/c:0}}
+function calc(list){let q=0,c=0;list.forEach(x=>{if(x.grade&&x.credit>0&&!(skipF&&x.grade==="F")){q+=SCALE[x.grade]*x.credit;c+=x.credit}});return{q,c,gpa:c?q/c:0}}
 const activeTerms=()=>S.mode==="term"?[S.single]:S.terms;
-const flat=()=>activeTerms().reduce((a,t)=>a.concat(t.courses),[]);
+S.saved=[];
+function total(){
+  if(S.mode==="term")return calc(S.single.courses);
+  const r=calc(S.terms.reduce((a,t)=>a.concat(t.courses),[]));
+  let q=r.q,c=r.c;S.saved.forEach(x=>{q+=x.q;c+=x.c});
+  return{q,c,gpa:c?q/c:0};
+}
 
 /* ---------- theme ---------- */
 function setTheme(t){
@@ -161,8 +189,49 @@ $("back1").onclick=()=>show(1);
 $("mTerm").onclick=()=>{S.mode="term";render()};
 $("mAll").onclick=()=>{S.mode="all";render()};
 
+/* ---------- grade scale ---------- */
+const isStd=()=>!skipF&&GRADES.every(g=>SCALE[g]===DEFAULT_SCALE[g]);
+const scaleText=()=>GRADES.map(g=>g+" "+fmt(SCALE[g])).join(", ")+(skipF?". F not counted":"");
+function scaleTag(){$("scaleTag").textContent=isStd()?"(Standard 4.00)":"(Custom)"}
+function buildScale(){
+  const grid=$("scaleGrid");grid.innerHTML="";
+  GRADES.forEach(g=>{
+    const l=document.createElement("label");
+    l.innerHTML=`${g}<input type="number" step="0.01" min="0" inputmode="decimal" value="${SCALE[g]}">`;
+    l.firstElementChild.oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v)&&v>=0){SCALE[g]=v;scaleTag();update()}};
+    grid.appendChild(l);
+  });
+  $("skipF").checked=skipF;scaleTag();
+}
+$("skipF").onchange=e=>{skipF=e.target.checked;scaleTag();update()};
+$("resetScale").onclick=()=>{SCALE={...DEFAULT_SCALE};skipF=false;buildScale();update()};
+buildScale();
+
 /* ---------- calculator ---------- */
+function renderSaved(){
+  const b=$("saved");b.innerHTML="";
+  if(!S.saved.length)return;
+  const card=document.createElement("div");card.className="card";
+  card.innerHTML="<b>Saved semesters</b>";
+  S.saved.forEach((x,i)=>{
+    const r=document.createElement("div");r.className="srow";
+    r.innerHTML=`<span>${esc(x.name)}</span><span class="meta">${x.c} cr</span><b class="gpa">${fmt(x.gpa)}</b><button class="x" title="Remove" aria-label="Remove semester">×</button>`;
+    r.lastChild.onclick=()=>{S.saved.splice(i,1);render()};
+    card.appendChild(r);
+  });
+  if(S.mode==="term"){
+    const h=document.createElement("p");h.className="meta";h.style.margin="10px 0";
+    h.textContent="Add more semesters, or get your total CGPA from all saved ones.";card.appendChild(h);
+    const go=document.createElement("button");go.className="btn p";go.textContent="Get overall CGPA";
+    go.onclick=()=>{S.mode="all";render()};card.appendChild(go);
+  }else{
+    const h=document.createElement("p");h.className="meta";h.style.margin="10px 0 0";
+    h.textContent="These are counted in your Overall CGPA below.";card.appendChild(h);
+  }
+  b.appendChild(card);
+}
 function render(){
+  renderSaved();
   $("mTerm").setAttribute("aria-pressed",S.mode==="term");
   $("mAll").setAttribute("aria-pressed",S.mode==="all");
   const box=$("calc");box.innerHTML="";
@@ -202,7 +271,7 @@ function render(){
 }
 function update(){
   activeTerms().forEach((t,i)=>{const r=calc(t.courses),e=$("g"+i);if(e)e.textContent=r.c?"GPA "+fmt(r.gpa):""});
-  const o=calc(flat());
+  const o=total();
   $("sumLabel").textContent=S.mode==="term"?"Term GPA":"Overall CGPA";
   $("sumVal").textContent=fmt(o.gpa);
   $("sumMeta").textContent=o.c?`${o.c} credits, ${fmt(o.q)} quality points`:"";
@@ -216,7 +285,8 @@ function drawImage(){
   const T=S.t,W=1080,pad=76,rowH=50,A=T.a,soft=mix(A,T.card,.86),all=S.mode==="all";
   const F="'Poppins',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
   const items=activeTerms().map((t,i)=>({name:t.name||(all?"Term "+(i+1):"Term"),courses:t.courses.filter(c=>c.grade),r:calc(t.courses)})).filter(t=>t.courses.length);
-  const H=310+items.reduce((s,t)=>s+140+t.courses.length*rowH,0)+280;
+  const sv=all?S.saved:[];
+  const H=310+(sv.length?140+sv.length*rowH:0)+items.reduce((s,t)=>s+140+t.courses.length*rowH,0)+280;
   const cv=document.createElement("canvas");cv.width=W;cv.height=H;
   const g=cv.getContext("2d");
   g.fillStyle=T.bg;g.fillRect(0,0,W,H);
@@ -228,6 +298,20 @@ function drawImage(){
   g.fillStyle=T.mute;g.font=`400 26px ${F}`;g.fillText(all?"Overall result":"Term result",pad,220);
   g.fillStyle=T.line;g.fillRect(pad,250,W-2*pad,2);
   let y=310;
+  if(sv.length){
+    g.fillStyle=T.ink;g.font=`700 32px ${F}`;g.textAlign="left";g.fillText("Saved semesters",pad,y);
+    y+=26;g.fillStyle=T.bg;g.fillRect(pad,y,W-2*pad,40);
+    g.fillStyle=T.mute;g.font=`600 22px ${F}`;g.fillText("Semester",pad+14,y+28);
+    g.textAlign="right";g.fillText("Credit",W-pad-170,y+28);g.fillText("GPA",W-pad-14,y+28);
+    y+=40;
+    sv.forEach(x=>{
+      y+=rowH;g.font=`400 26px ${F}`;g.fillStyle=T.ink;g.textAlign="left";g.fillText(x.name.slice(0,30),pad+14,y-14);
+      g.textAlign="right";g.fillText(String(x.c),W-pad-170,y-14);
+      g.font=`700 26px ${F}`;g.fillText(fmt(x.gpa),W-pad-14,y-14);
+      g.fillStyle=T.line;g.fillRect(pad,y,W-2*pad,1);
+    });
+    y+=74;
+  }
   items.forEach(t=>{
     g.fillStyle=T.ink;g.font=`700 32px ${F}`;g.textAlign="left";g.fillText(t.name.slice(0,30),pad,y);
     g.fillStyle=A;g.textAlign="right";g.fillText("GPA "+fmt(t.r.gpa),W-pad,y);
@@ -245,25 +329,31 @@ function drawImage(){
     });
     y+=74;
   });
-  const o=calc(items.reduce((a,t)=>a.concat(t.courses),[]));
+  const o=total();
   g.fillStyle=soft;g.fillRect(pad,y-20,W-2*pad,170);
   g.fillStyle=T.mute;g.font=`400 28px ${F}`;g.textAlign="left";g.fillText(all?"Overall CGPA":"Term GPA",pad+30,y+34);
   g.fillStyle=A;g.font=`700 96px ${F}`;g.fillText(fmt(o.gpa),pad+30,y+130);
   g.fillStyle=T.mute;g.font=`400 26px ${F}`;g.textAlign="right";
   g.fillText(o.c+" credits",W-pad-30,y+64);g.fillText(fmt(o.q)+" quality points",W-pad-30,y+104);
   g.textAlign="left";g.font=`400 22px ${F}`;
-  g.fillText("Unofficial. Calculated on a 4.00 grade scale.",pad,H-62);
+  g.fillText("Unofficial. "+(isStd()?"Calculated on the standard 4.00 grade scale.":"Calculated on a custom grade scale."),pad,H-62);
   return cv;
 }
 async function makeResult(){
   try{await Promise.all(["400","600","700"].map(w=>document.fonts.load(w+" 24px Poppins")))}catch(e){}
   const cv=drawImage();
   S.blob=await new Promise(r=>cv.toBlob(r,"image/png"));
+  $("scaleNote").textContent="Unofficial. Grade scale used: "+scaleText()+".";
   $("img").src=URL.createObjectURL(S.blob);
 }
-$("goRes").onclick=async()=>{await makeResult();show(3)};
+$("goRes").onclick=async()=>{await makeResult();$("saveBox").style.display=S.mode==="term"?"block":"none";show(3)};
+$("saveSem").onclick=()=>{
+  const r=calc(S.single.courses);if(!r.c)return;
+  S.saved.push({name:S.single.name||"Semester "+(S.saved.length+1),q:r.q,c:r.c,gpa:r.gpa});
+  S.single=newTerm("");S.mode="term";render();show(2);
+};
 $("back2").onclick=()=>show(2);
-$("again").onclick=()=>{S.single=newTerm("");S.terms=[newTerm("Level 1 - Term I")];S.mode="term";render();show(2)};
+$("again").onclick=()=>{if(S.saved.length&&!confirm("Your saved semesters will be cleared. Continue?"))return;S.saved=[];S.single=newTerm("");S.terms=[newTerm("Level 1 - Term I")];S.mode="term";render();show(2)};
 $("dl").onclick=()=>{const a=document.createElement("a");a.href=$("img").src;a.download="my-result.png";a.click()};
 $("share").onclick=async()=>{
   const f=new File([S.blob],"my-result.png",{type:"image/png"});
